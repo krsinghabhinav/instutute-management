@@ -724,7 +724,7 @@ routes.get("/getStudentDetails/:studentId", check_auth_user, async (req, res) =>
 
 
 // delete student 
-
+// fsfosfosofsfsiojfio
 routes.delete("/deleteStudent/:studentId", check_auth_user, async (req, res) => {
   try {
     const studentId = req.params.studentId;
