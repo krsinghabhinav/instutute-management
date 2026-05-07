@@ -34,12 +34,12 @@ const courseSchema = new mongoose.Schema(
 
     courseImageUrl: {
       type: String,
-      required: true,
+
     },
 
     imageId: {
       type: String,
-      required: true,
+
     },
 
     userId: {

@@ -10,7 +10,7 @@ const mongoose = require("mongoose");
 const check_auth_user = require("../middlewares/check_auth_user");
 const CourseRecord = require("../model/course_model");
 const StudentRecord = require("../model/student_model")
-
+const feeRecord = require("../model/fees_model")
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME || "dyit1jjef",
   api_key: process.env.CLOUD_KEY || "743564427533897",
@@ -124,93 +124,93 @@ cloudinary.config({
   }
 }); */
 
-routes.post("/addStudent", check_auth_user, async (req, res) => {
-  try {
-    const { fullName, phone, studentEmail, address, courseId } = req.body;
+// routes.post("/addStudent", check_auth_user, async (req, res) => {
+//   try {
+//     const { fullName, phone, studentEmail, address, courseId } = req.body;
 
-    // // Use either studentEmail or email from frontend
-    // const studentEmail = reqEmail || altEmail;
+//     // // Use either studentEmail or email from frontend
+//     // const studentEmail = reqEmail || altEmail;
 
-    // Validate fields
-    if (!fullName || !phone || !studentEmail || !address || !courseId) {
-      return res.status(400).json({
-        status: false,
-        message: "All fields are required!",
-      });
-    }
+//     // Validate fields
+//     if (!fullName || !phone || !studentEmail || !address || !courseId) {
+//       return res.status(400).json({
+//         status: false,
+//         message: "All fields are required!",
+//       });
+//     }
 
-    if (!req.user?.userId) {
-      return res.status(401).json({
-        status: false,
-        message: "Unauthorized access!",
-      });
-    }
+//     if (!req.user?.userId) {
+//       return res.status(401).json({
+//         status: false,
+//         message: "Unauthorized access!",
+//       });
+//     }
 
-    // Check if auth user exists
-    const existUser = await UserRecord.findById(req.user.userId);
-    if (!existUser) {
-      return res.status(404).json({ status: false, message: "User not found!" });
-    }
+//     // Check if auth user exists
+//     const existUser = await UserRecord.findById(req.user.userId);
+//     if (!existUser) {
+//       return res.status(404).json({ status: false, message: "User not found!" });
+//     }
 
-    // Phone validation
-    if (phone.length !== 10) {
-      return res.status(400).json({ status: false, message: "Phone number must be 10 digits" });
-    }
+//     // Phone validation
+//     if (phone.length !== 10) {
+//       return res.status(400).json({ status: false, message: "Phone number must be 10 digits" });
+//     }
 
-    // ❌ Prevent same student in SAME course
-    const alreadyInSameCourse = await StudentRecord.findOne({ studentEmail, courseId });
-    if (alreadyInSameCourse) {
-      return res.status(400).json({ status: false, message: "This student already exists in this course!" });
-    }
+//     // ❌ Prevent same student in SAME course
+//     const alreadyInSameCourse = await StudentRecord.findOne({ phone, courseId: courseId });
+//     if (alreadyInSameCourse) {
+//       return res.status(400).json({ status: false, message: "This student already exists in this course!" });
+//     }
 
-    // Check course validity
-    const courseExists = await CourseRecord.findById(courseId);
-    if (!courseExists) {
-      return res.status(404).json({ status: false, message: "Selected course does not exist!" });
-    }
+//     // Check course validity
+//     const courseExists = await CourseRecord.findById(courseId);
+//     if (!courseExists) {
+//       return res.status(404).json({ status: false, message: "Selected course does not exist!" });
+//     }
 
-    // Upload student image
-    let studentImageUrl = "";
-    let imageId = "";
+//     // Upload student image
+//     let studentImageUrl = "";
+//     let imageId = "";
 
-    if (req.files && req.files.studentImage) {
-      const file = req.files.studentImage;
-      const result = await cloudinary.uploader.upload(file.tempFilePath, { folder: "student_images" });
-      studentImageUrl = result.secure_url;
-      imageId = result.public_id.split("/").pop();
-    } else {
-      return res.status(400).json({ status: false, message: "Student image is required!" });
-    }
+//     if (req.files && req.files.studentImage) {
+//       const file = req.files.studentImage;
+//       const result = await cloudinary.uploader.upload(file.tempFilePath, { folder: "student_images" });
+//       studentImageUrl = result.secure_url;
+//       imageId = result.public_id.split("/").pop();
+//     } else {
+//       return res.status(400).json({ status: false, message: "Student image is required!" });
+//     }
 
-    // Save student
-    const newStudent = new StudentRecord({
-      _id: new mongoose.Types.ObjectId(),
-      fullName,
-      phone,
-      studentEmail,
-      address,
-      userId: req.user.userId,
-      courseId,
-      studentImageUrl,
-      imageId,
-    });
+//     // Save student
+//     const newStudent = new StudentRecord({
+//       _id: new mongoose.Types.ObjectId(),
+//       fullName,
+//       phone,
+//       studentEmail,
+//       address,
+//       userId: req.user.userId,
+//       courseId,
+//       studentImageUrl,
+//       imageId,
+//     });
 
-    await newStudent.save();
+//     await newStudent.save();
 
-    return res.status(200).json({
-      status: true,
-      message: "Student added successfully!",
-      studentData: newStudent,
-    });
+//     return res.status(200).json({
+//       status: true,
+//       message: "Student added successfully!",
+//       studentData: newStudent,
+//     });
 
-  } catch (error) {
-    return res.status(500).json({
-      status: false,
-      message: "Internal Server Error",
-      error: error.message,
-    });
-  }
-});
+//   } catch (error) {
+//     return res.status(500).json({
+//       status: false,
+//       message: "Internal Server Error",
+//       error: error.message,
+//     });
+//   }
+// });
 
 // get all the student 
 /* routes.get("/getAllStudent", check_auth_user, async (req, res) => {
@@ -297,6 +297,116 @@ routes.post("/addStudent", check_auth_user, async (req, res) => {
   }
 });
  */
+routes.post("/addStudent", check_auth_user, async (req, res) => {
+  try {
+    const { fullName, phone, studentEmail, address, courseId } = req.body;
+
+    // 🔹 Validate fields
+    if (!fullName || !phone || !studentEmail || !address || !courseId) {
+      return res.status(200).json({
+        status: false,
+        message: "All fields are required!",
+      });
+    }
+
+    // 🔹 Auth check
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        status: false,
+        message: "Unauthorized access!",
+      });
+    }
+
+    // 🔹 Check auth user
+    const existUser = await UserRecord.findById(req.user.userId);
+    if (!existUser) {
+      return res.status(200).json({
+        status: false,
+        message: "User not found!",
+      });
+    }
+
+    // 🔹 Phone validation
+    if (phone.length !== 10) {
+      return res.status(200).json({
+        status: false,
+        message: "Phone number must be 10 digits",
+      });
+    }
+
+    // 🔹 Prevent duplicate student in same course
+    const alreadyInSameCourse = await StudentRecord.findOne({
+      phone,
+      courseId,
+    });
+
+    if (alreadyInSameCourse) {
+      return res.status(200).json({
+        status: false,
+        message: "This student already exists in this course!",
+      });
+    }
+
+    // 🔹 Check course
+    const courseExists = await CourseRecord.findById(courseId);
+    if (!courseExists) {
+      return res.status(200).json({
+        status: false,
+        message: "Selected course does not exist!",
+      });
+    }
+
+    // 🔹 Image upload
+    let studentImageUrl = "";
+    let imageId = "";
+
+    if (req.files && req.files.studentImage) {
+      const file = req.files.studentImage;
+
+      const result = await cloudinary.uploader.upload(
+        file.tempFilePath,
+        { folder: "student_images" }
+      );
+
+      studentImageUrl = result.secure_url;
+      imageId = result.public_id.split("/").pop();
+    } /* else {
+      return res.status(200).json({
+        status: false,
+        message: "Student image is required!",
+      }); */
+    // }
+
+    // 🔹 Save student
+    const newStudent = new StudentRecord({
+      _id: new mongoose.Types.ObjectId(),
+      fullName,
+      phone,
+      studentEmail,
+      address,
+      userId: req.user.userId,
+      courseId,
+      studentImageUrl,
+      imageId,
+    });
+
+    await newStudent.save();
+
+    // ✅ SUCCESS
+    return res.status(200).json({
+      status: true,
+      message: "Student added successfully!",
+      studentData: newStudent,
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+    });
+  }
+});
 
 // get all the student 
 /* routes.get("/getAllStudent", check_auth_user, async (req, res) => {
@@ -408,7 +518,7 @@ routes.get("/getAllStudent", check_auth_user, async (req, res) => {
       userId: req.user.userId
     })
       .sort({ createdAt: -1 })
-      .populate("userId", "firstName lastName userName imageUrl");
+      .populate("userId", "instFullName userName imageUrl");
 
     let studentResult = [];
     let uniqueEmails = new Set();
@@ -419,10 +529,10 @@ routes.get("/getAllStudent", check_auth_user, async (req, res) => {
       let userInfo = student.userId;
 
       // ---------------- Remove Duplicate Students (Email) ----------------
-      if (uniqueEmails.has(student.studentEmail)) {
-        continue;
-      }
-      uniqueEmails.add(student.studentEmail);
+      // if (uniqueEmails.has(student.studentEmail)) {
+      //   continue;
+      // }
+      // uniqueEmails.add(student.studentEmail);
 
       // ---------------- Get Course Details Properly ----------------
       const course = await CourseRecord.findOne({
@@ -498,7 +608,7 @@ routes.get("/getAllStudentForaCourse/:courseId", check_auth_user, async (req, re
     const students = await StudentRecord.find({
       courseId: courseId
     }).sort({ createdAt: -1 })
-      .populate("userId", "firstName lastName userName imageUrl");
+      .populate("userId", "instFullName userName imageUrl");
 
     let studentResult = [];
     let uniqueEmails = new Set();
@@ -658,7 +768,7 @@ routes.patch("/updateStudent/:studentId", check_auth_user, async (req, res) => {
 
 
 
-// Get single student details
+// Get single student details with fees list
 routes.get("/getStudentDetails/:studentId", check_auth_user, async (req, res) => {
   try {
     const studentId = req.params.studentId;
@@ -690,7 +800,7 @@ routes.get("/getStudentDetails/:studentId", check_auth_user, async (req, res) =>
     // ---------------- Student Check ----------------
     const student = await StudentRecord.findById(studentId)
       .populate("courseId", "courseName price courseImageUrl")
-      .populate("userId", "firstName lastName userName imageUrl");
+      .populate("userId", "instFullName userName imageUrl");
 
     if (!student) {
       return res.status(404).json({
@@ -707,10 +817,17 @@ routes.get("/getStudentDetails/:studentId", check_auth_user, async (req, res) =>
       });
     }
 
+
+
+
+    // const fee = await feeRecord.find({ userId: req.user.userId, courseId: student.courseId, phone: student.phone })
+
+
     return res.status(200).json({
       status: true,
       message: "Student details fetched successfully!",
       studentDetails: student,
+
     });
 
   } catch (error) {
@@ -774,8 +891,12 @@ routes.delete("/deleteStudent/:studentId", check_auth_user, async (req, res) => 
     if (student.imageId) {
       const imagePublicId = `student_images/${student.imageId}`;
       await cloudinary.uploader.destroy(imagePublicId);
+      student.studentImageUrl = "";
+      student.imageId = "";
     }
 
+
+    const fee = feeRecord.find({})
     // ---------------- Delete Student Record ----------------
     await student.deleteOne();
 
@@ -823,9 +944,9 @@ routes.get("/getLatestStudent", check_auth_user, async (req, res) => {
     // ---------------- Students Fetch ----------------
     // Fetch latest 5 student docs and populate user & course in single query
     const students = await StudentRecord.find({ userId: req.user.userId })
-      .sort({ createdAt: -1 })
+      .sort({ $natural: -1 })
       .limit(5)
-      .populate("userId", "firstName lastName userName imageUrl")
+      .populate("userId", "instFullName userName imageUrl")
       .populate("courseId", "courseName price courseImageUrl");
 
     let studentResult = [];
@@ -837,8 +958,8 @@ routes.get("/getLatestStudent", check_auth_user, async (req, res) => {
       // userData comes from populate
       const userData = student.userId ? {
         _id: student.userId._id,
-        firstName: student.userId.firstName,
-        lastName: student.userId.lastName,
+        instFullName: student.userId.instFullName,
+
         userName: student.userId.userName,
         imageUrl: student.userId.imageUrl
       } : {};
@@ -884,4 +1005,164 @@ routes.get("/getLatestStudent", check_auth_user, async (req, res) => {
   }
 });
 
+
+//get 5 latest course 
+routes.get("/getLatestCourse", check_auth_user, async (req, res) => {
+  try {
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        status: false,
+        message: "Unauthorized access! Invalid or missing token.",
+      });
+    }
+
+    // ---------------- User Check ----------------
+    const existUser = await UserRecord.findById(req.user.userId);
+    if (!existUser) {
+      return res.status(404).json({
+        status: false,
+        message: "User not found!",
+      });
+    }
+    if (existUser.isDeleted) {
+      return res.status(400).json({
+        status: false,
+        message: "Your account is marked for deletion.",
+      });
+    }
+
+    const courses = await CourseRecord.find({ userId: req.user.userId })
+      .sort({ $natural: -1 })
+      .limit(5)
+      .populate("userId", "instFullName userName imageUrl");
+
+
+    if (!courses) {
+      return res.status(404).json({
+        status: false,
+        message: "Course not found!",
+      });
+    }
+
+    let courseResult = [];
+
+    for (let i = 0; i < courses.length; i++) {
+
+      const course = courses[i].toObject();
+
+      const userInfo = courses[i].userId;
+
+      delete course.userId;
+
+      courseResult.push({
+        courseData: course,
+        userData: userInfo
+      })
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: "Latest 5 course  fetched successfully!",
+      totalCourse: courseResult.length,
+      courseData: courseResult,
+    });
+
+
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+})
+
+
+// Get single student details
+routes.get("/getStudentDetailswithFeesList/:studentId", check_auth_user, async (req, res) => {
+  try {
+    const studentId = req.params.studentId;
+
+    // ---------------- Token Check ----------------
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        status: false,
+        message: "Unauthorized access!",
+      });
+    }
+
+    // ---------------- User Check ----------------
+    const existUser = await UserRecord.findById(req.user.userId);
+    if (!existUser) {
+      return res.status(404).json({
+        status: false,
+        message: "User not found!",
+      });
+    }
+
+    if (existUser.isDeleted) {
+      return res.status(400).json({
+        status: false,
+        message: "Your account is marked for deletion.",
+      });
+    }
+
+    // ---------------- Student Check ----------------
+    const student = await StudentRecord.findById(studentId)
+      .populate("courseId", "courseName price courseImageUrl")
+      .populate("userId", "instFullName userName imageUrl");
+
+    if (!student) {
+      return res.status(404).json({
+        status: false,
+        message: "Student not found!",
+      });
+    }
+
+    // ---------------- Authorization Check ----------------
+    if (student.userId._id.toString() !== req.user.userId) {
+      return res.status(403).json({
+        status: false,
+        message: "You are not authorized to view this student!",
+      });
+    }
+
+    delete student.userId;
+
+    const fee = await feeRecord.find({ userId: req.user.userId, courseId: student.courseId, phone: student.phone })
+    const studentDetailsData = {
+      studentDetails: {
+        studentId: student._id,
+        fullName: student.fullName,
+        phone: student.phone,
+        studentEmail: student.studentEmail,
+        studentAddress: student.address,
+        studentImage: student.studentImageUrl,
+        userData: student.userId,
+        courseData: student.courseId,
+
+      },
+
+      studentFeesList: fee,
+      totalFeeList: fee.length,
+    }
+
+
+
+
+
+    return res.status(200).json({
+      status: true,
+      message: "Student details fetched successfully!",
+      student: studentDetailsData,
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
 module.exports = routes;

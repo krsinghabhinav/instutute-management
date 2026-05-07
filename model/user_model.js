@@ -3,9 +3,9 @@ const mongoose = require("mongoose");
 const userSchema = new mongoose.Schema(
   {
     _id: mongoose.Schema.Types.ObjectId,
-
-    firstName: { type: String, required: true, trim: true },
-    lastName: { type: String, required: true, trim: true },
+//institute first and last name rhenga
+    instFullName: { type: String, required: true, trim: true },
+    // lastName: { type: String, required: true, trim: true },
     phoneNumber: { type: String, required: true, trim: true },
     imageUrl: { type: String, default: "" }, // ✅ not required now
     imageId: { type: String, default: "" }, // ✅ not required now

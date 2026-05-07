@@ -18,7 +18,7 @@ const connectDB = async () => {
   }
 };
 
-connectDB();
+connectDB();  
 
 // Cron job (midnight)
 cron.schedule("0 0 * * *", async () => {

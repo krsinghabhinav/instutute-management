@@ -15,12 +15,11 @@ cloudinary.config({
   api_key: process.env.CLOUD_KEY || "743564427533897",
   api_secret: process.env.CLOUD_SECRET || "TR9TvJlNF5Blp6AcyZ0plQ0kqkQ",
 });
-
+``
 routes.post("/userSignup", async (req, res) => {
   try {
     const {
-      firstName,
-      lastName,
+      instFullName,
       phoneNumber,
       address,
       email,
@@ -30,8 +29,8 @@ routes.post("/userSignup", async (req, res) => {
 
     // 🔹 Validate input
     if (
-      !firstName ||
-      !lastName ||
+      !instFullName ||
+
       !phoneNumber ||
       !address ||
       !email ||
@@ -87,8 +86,7 @@ routes.post("/userSignup", async (req, res) => {
     // 🔹 Create new user
     const newUser = new UserRecord({
       _id: new mongoose.Types.ObjectId(), // 👈 Auto ID fix
-      firstName,
-      lastName,
+      instFullName,
       phoneNumber,
       address,
       email,
@@ -107,8 +105,7 @@ routes.post("/userSignup", async (req, res) => {
       message: "Signup successful",
       userData: {
         id: newUser._id,
-        firstName,
-        lastName,
+        instFullName,
         phoneNumber,
         address,
         userName,
@@ -167,8 +164,7 @@ routes.post("/userLogin", async (req, res) => {
     const token = jwt.sign(
       {
         userId: existUser._id,
-        firstName: existUser.firstName,
-        lastName: existUser.lastName,
+        instFullName: existUser.instFullName,
         email: existUser.email,
         phoneNumber: existUser.phoneNumber,
       },
@@ -230,9 +226,9 @@ routes.get("/getUserDetails", check_auth_user, async (req, res) => {
   }
 });
 
-routes.patch("/updateUser", check_auth_user, async (req, res) => {
+/* routes.patch("/updateUser", check_auth_user, async (req, res) => {
   try {
-    const { firstName, lastName, phoneNumber, address, userName } = req.body;
+    const { instFullName, phoneNumber, address, userName } = req.body;
 
     // Find existing user
     const existUser = await UserRecord.findById(req.user.userId);
@@ -268,8 +264,7 @@ routes.patch("/updateUser", check_auth_user, async (req, res) => {
     }
 
     // Update user fields
-    existUser.firstName = firstName || existUser.firstName;
-    existUser.lastName = lastName || existUser.lastName;
+    existUser.instFullName = instFullName || existUser.instFullName;
     existUser.phoneNumber = phoneNumber || existUser.phoneNumber;
     existUser.address = address || existUser.address;
     existUser.imageUrl = imageUrl || existUser.imageUrl;
@@ -290,8 +285,163 @@ routes.patch("/updateUser", check_auth_user, async (req, res) => {
       error: err.message,
     });
   }
-});
+}); */
 
+// routes.patch("/updateUser", check_auth_user, async (req, res) => {
+//   try {
+//     const { instFullName, phoneNumber, address, userName } = req.body;
+
+//     // Find existing user
+//     const existUser = await UserRecord.findById(req.user.userId);
+//     if (!existUser) {
+//       return res.status(404).json({ status: false, message: "User not found" });
+//     }
+
+//     // 🛑 FIX: Check if username already exists (and not the same user)
+//     if (userName && userName !== existUser.userName) {
+//       const isUsernameExist = await UserRecord.findOne({ userName });
+
+//       if (isUsernameExist) {
+//         return res.status(400).json({
+//           status: false,
+//           message: "Username already taken, choose another one",
+//         });
+//       }
+//     }
+
+//     let imageUrl = existUser.imageUrl;
+//     let imageId = existUser.imageId;
+
+//     // If new image uploaded
+//     if (req.files?.image) {
+//       const file = req.files.image;
+
+//       // Delete old image from Cloudinary if exists
+//       if (existUser.imageId) {
+//         const oldPublicId = `user_folder/${existUser.imageId}`;
+//         await cloudinary.uploader.destroy(oldPublicId); // old image deleted
+//       }
+
+//       // Upload new image with same imageId name to replace
+//       const uploadResult = await cloudinary.uploader.upload(file.tempFilePath, {
+//         folder: "user_folder",
+//         public_id: existUser.imageId || undefined,
+//         overwrite: true,
+//       });
+
+//       const fullId = uploadResult.public_id;
+//       const shortId = fullId.split("/").pop();
+
+//       imageUrl = uploadResult.secure_url;
+//       imageId = shortId;
+//     }
+
+//     // Update user fields
+//     existUser.instFullName = instFullName || existUser.instFullName;
+//     existUser.phoneNumber = phoneNumber || existUser.phoneNumber;
+//     existUser.address = address || existUser.address;
+//     existUser.imageUrl = imageUrl || existUser.imageUrl;
+//     existUser.imageId = imageId || existUser.imageId;
+//     existUser.userName = userName || existUser.userName;
+
+//     await existUser.save();
+
+//     res.status(200).json({
+//       status: true,
+//       message: "User updated successfully",
+//       user: existUser,
+//     });
+//   } catch (err) {
+//     res.status(500).json({
+//       status: false,
+//       message: "Internal Server Error",
+//       error: err.message,
+//     });
+//   }
+// });
+
+routes.patch("/updateUser", check_auth_user, async (req, res) => {
+  try {
+    const { instFullName, phoneNumber, address, userName, password } = req.body;
+
+    const existUser = await UserRecord.findById(req.user.userId);
+    if (!existUser) {
+      return res.status(404).json({ status: false, message: "User not found" });
+    }
+
+    // Username check
+    if (userName && userName !== existUser.userName) {
+      const isUsernameExist = await UserRecord.findOne({ userName });
+
+      if (isUsernameExist) {
+        return res.status(400).json({
+          status: false,
+          message: "Username already taken",
+        });
+      }
+    }
+
+    let imageUrl = existUser.imageUrl;
+    let imageId = existUser.imageId;
+
+    // Image update
+    if (req.files?.image) {
+      const file = req.files.image;
+
+      if (existUser.imageId) {
+        const oldPublicId = `user_folder/${existUser.imageId}`;
+        await cloudinary.uploader.destroy(oldPublicId);
+      }
+
+      const uploadResult = await cloudinary.uploader.upload(file.tempFilePath, {
+        folder: "user_folder",
+        public_id: existUser.imageId || undefined,
+        overwrite: true,
+      });
+
+      const shortId = uploadResult.public_id.split("/").pop();
+
+      imageUrl = uploadResult.secure_url;
+      imageId = shortId;
+    }
+
+    // 🔐 Password update (IMPORTANT)
+    if (password) {
+      if (password.length < 6) {
+        return res.status(400).json({
+          status: false,
+          message: "Password must be at least 6 characters",
+        });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      existUser.password = hashedPassword;
+    }
+
+    // Other fields update
+    existUser.instFullName = instFullName || existUser.instFullName;
+    existUser.phoneNumber = phoneNumber || existUser.phoneNumber;
+    existUser.address = address || existUser.address;
+    existUser.userName = userName || existUser.userName;
+    existUser.imageUrl = imageUrl;
+    existUser.imageId = imageId;
+
+    await existUser.save();
+
+    res.status(200).json({
+      status: true,
+      message: "User updated successfully",
+      user: existUser,
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: err.message,
+    });
+  }
+});
 routes.post("/change_password", check_auth_user, async (req, res) => {
   try {
     const { newPassword } = req.body;
@@ -346,7 +496,7 @@ routes.post("/change_password", check_auth_user, async (req, res) => {
   }
 });
 
-routes.delete("/delete_account", check_auth_user, async (req, res) => {
+routes.delete("/deleteAccount", check_auth_user, async (req, res) => {
   try {
     if (!req.user || !req.user.userId) {
       return res.status(401).json({
@@ -392,8 +542,7 @@ routes.delete("/delete_account", check_auth_user, async (req, res) => {
         "Your account has been marked for deletion. It will be permanently deleted after 10 days.",
       userData: {
         _id: existUser._id,
-        firstName: existUser.firstName,
-        lastName: existUser.lastName,
+        instFullName: existUser.instFullName,
         email: existUser.email,
         phoneNumber: existUser.phoneNumber,
         address: existUser.address,

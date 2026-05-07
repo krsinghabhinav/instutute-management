@@ -12,9 +12,9 @@ const studentSchema = new mongoose.Schema(
 
         address: { type: String, required: true, trim: true },
 
-        studentImageUrl: { type: String, required: true },
+        studentImageUrl: { type: String, },
 
-        imageId: { type: String, required: true },
+        imageId: { type: String, },
 
         courseId: {
             type: mongoose.Schema.Types.ObjectId,
@@ -34,8 +34,8 @@ const studentSchema = new mongoose.Schema(
 // 🟢 ALLOW: same email + different course
 // ❌ BLOCK: same email + same course
 studentSchema.index(
-  { studentEmail: 1, courseId: 1 },
-  { unique: true, partialFilterExpression: { studentEmail: { $type: "string" } } }
+    { studentEmail: 1, courseId: 1 },
+    { unique: true, partialFilterExpression: { studentEmail: { $type: "string" } } }
 );
 
 module.exports = mongoose.model("StudentRecord", studentSchema);

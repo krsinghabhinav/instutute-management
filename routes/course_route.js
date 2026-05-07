@@ -9,7 +9,8 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const check_auth_user = require("../middlewares/check_auth_user");
 const CourseRecord = require("../model/course_model");
-
+const StudentRecord = require("../model/student_model")
+const feesRecord = require("../model/fees_model")
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME || "dyit1jjef",
   api_key: process.env.CLOUD_KEY || "743564427533897",
@@ -168,13 +169,13 @@ routes.post("/addCourse", check_auth_user, async (req, res) => {
 
       courseImageUrl = result.secure_url;
       imageId = shortId;
-    } else {
+    } /* else {
       return res.status(400).json({
         status: false,
         message: "Course image is required",
       });
     }
-
+ */
     // Create New Course
     const newCourse = new CourseRecord({
       _id: new mongoose.Types.ObjectId(),
@@ -248,7 +249,7 @@ routes.get("/allCourse", check_auth_user, async (req, res) => {
       userId: req.user.userId,
     })
       .sort({ createdAt: -1 })
-      .populate("userId", "firstName lastName userName imageUrl");
+      .populate("userId", "instFullName userName imageUrl");
 
     // 🔹 5. Prepare final result array
     let result = [];
@@ -430,7 +431,7 @@ routes.get("/courseDetails/:courseId", check_auth_user, async (req, res) => {
     const courseData = await CourseRecord.findOne({
       _id: courseId,
       userId: req.user.userId
-    }).populate("userId", "firstName lastName userName imageUrl");
+    }).populate("userId", "instFullName userName imageUrl");
 
     if (!courseData) {
       return res.status(404).json({
@@ -632,10 +633,23 @@ routes.delete("/courseDelete/:courseId", check_auth_user, async (req, res) => {
       course.courseImageUrl = "";
       course.imageId = "";
     }
+    // 6. Find All Students of this course
+    const allStudents = await StudentRecord.find({ courseId: courseId });
 
+    // 7. Delete each student's image from Cloudinary
+    for (const student of allStudents) {
+      if (student.imageId) {
+        const studentPublicId = `student_images/${student.imageId}`;
+        await cloudinary.uploader.destroy(studentPublicId);
+        student.studentImageUrl = "";
+        student.imageId = "";
+      }
+    }
     // 🔹 6. Delete course record from DB
     await course.deleteOne();
 
+    // 🔹 7. Delete all students related to this course
+    await StudentRecord.deleteMany({ courseId: courseId });
     return res.status(200).json({
       status: true,
       message: "Course deleted successfully!",
@@ -649,6 +663,297 @@ routes.delete("/courseDelete/:courseId", check_auth_user, async (req, res) => {
     });
   }
 });
+
+
+// Get Course Details + All Students Enrolled in That Course
+routes.get("/courseDetailsWithStudent/:courseId", check_auth_user, async (req, res) => {
+  try {
+    const courseId = req.params.courseId;
+
+    // 1. Token Validation
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        status: false,
+        message: "Unauthorized access!",
+      });
+    }
+
+    // 2. Check User Exists
+    const existUser = await UserRecord.findById(req.user.userId);
+    if (!existUser) {
+      return res.status(404).json({
+        status: false,
+        message: "User not found!",
+      });
+    }
+
+    if (existUser.isDeleted) {
+      return res.status(400).json({
+        status: false,
+        message: "Your account is marked for deletion.",
+      });
+    }
+
+    // 3. Find Course (only that course which belongs to this user)
+    const courseData = await CourseRecord.findOne({
+      _id: courseId,
+      userId: req.user.userId
+    }).populate("userId", "instFullName userName imageUrl");
+
+    if (!courseData) {
+      return res.status(404).json({
+        status: false,
+        message: "Course not found!",
+      });
+    }
+
+    // 4. Find All Students Enrolled in This Course
+    const students = await StudentRecord.find({
+      courseId: courseId,
+      userId: req.user.userId
+    }).select("fullName studentEmail phone studentImageUrl createdAt");
+
+    // Response Structure
+    const responseData = {
+      courseDetails: {
+        courseId: courseData._id,
+        courseName: courseData.courseName,
+        price: courseData.price,
+        description: courseData.description,
+        courseImageUrl: courseData.courseImageUrl,
+        startDate: courseData.startDate,
+        endDate: courseData.endDate,
+        user: courseData.userId
+      },
+      totalStudents: students.length,
+      studentList: students
+    };
+
+    return res.status(200).json({
+      status: true,
+      message: "Course Student list fetched successfully!",
+      data: responseData
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
+
+/* // Get Course Details + All Students Enrolled in That Course
+routes.get("/courseDetailsWithStudent/:courseId", check_auth_user, async (req, res) => {
+  try {
+    const courseId = req.params.courseId;
+
+    // 1. Token Validation
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        status: false,
+        message: "Unauthorized access!",
+      });
+    }
+
+    // 2. Check User Exists
+    const existUser = await UserRecord.findById(req.user.userId);
+    if (!existUser) {
+      return res.status(404).json({
+        status: false,
+        message: "User not found!",
+      });
+    }
+
+    if (existUser.isDeleted) {
+      return res.status(400).json({
+        status: false,
+        message: "Your account is marked for deletion.",
+      });
+    }
+
+    // 3. Find Course (only user’s course)
+    const courseData = await CourseRecord.findOne({
+      _id: courseId,
+      userId: req.user.userId
+    }).populate("userId", "firstName lastName userName imageUrl");
+
+    if (!courseData) {
+      return res.status(404).json({
+        status: false,
+        message: "Course not found!",
+      });
+    }
+
+    // 4. Find all students enrolled in this course
+    const students = await StudentRecord.find({
+      courseId: courseId,
+      userId: req.user.userId
+    }).select("fullName studentEmail phone imageUrl createdAt");
+
+    
+    // Final Response
+    const responseData = {
+      courseDetails: courseData,
+      totalStudents: students.length,
+      studentList: students
+    };
+
+    return res.status(200).json({
+      status: true,
+      message: "Course + Student list fetched successfully!",
+      data: responseData
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+}); */
+
+
+routes.get("/homeApi", check_auth_user, async (req, res) => {
+  try {
+
+    // ---------------------------------------------------
+    // 🔹 1) Latest 5 Courses
+    // ---------------------------------------------------
+    const latestCourses = await CourseRecord.find({ userId: req.user.userId })
+      .sort({ $natural: -1 })
+      .limit(5)
+      .populate("userId", "instFullName userName imageUrl");
+
+    let courseResult = [];
+
+    for (let i = 0; i < latestCourses.length; i++) {
+      const course = latestCourses[i].toObject();
+      delete course.userId;
+
+      courseResult.push({
+        courseData: course
+      });
+    }
+
+    // ---------------------------------------------------
+    // 🔹 2) Latest 5 Students
+    // ---------------------------------------------------
+    const students = await StudentRecord.find({ userId: req.user.userId })
+      .sort({ $natural: -1 })
+      .limit(5)
+      .populate("userId", "instFullName userName imageUrl")
+      .populate("courseId", "courseName price courseImageUrl");
+
+    let studentResult = [];
+
+    for (let i = 0; i < students.length; i++) {
+
+      const student = students[i].toObject();
+
+      const userDatas = students[i].userId
+        ? {
+          _id: students[i].userId._id,
+          instFullName: students[i].userId.instFullName,
+          userName: students[i].userId.userName,
+          imageUrl: students[i].userId.imageUrl
+        }
+        : {};
+
+      const courseDatas = students[i].courseId
+        ? {
+          _id: students[i].courseId._id,
+          courseName: students[i].courseId.courseName,
+          price: students[i].courseId.price,
+          courseImageUrl: students[i].courseId.courseImageUrl
+        }
+        : {};
+
+      delete student.userId;
+      delete student.__v;
+
+      student.courseId = students[i].courseId ? String(students[i].courseId._id) : student.courseId;
+
+      studentResult.push({
+        studentData: student,
+        userDatas,
+        courseDatas
+      });
+    }
+
+    // ---------------------------------------------------
+    // 🔹 3) Latest 5 Fees (Payments)
+    // ---------------------------------------------------
+    const latestPayments = await feesRecord.find({ userId: req.user.userId })
+      .sort({ $natural: -1 })
+      .limit(5)
+      .populate("userId", "instFullName userName imageUrl");
+
+
+
+
+    const totalAmountData = await feesRecord.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(req.user.userId) } },
+      { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+
+    // If no records found → default 0
+    const totalAmount = totalAmountData.length > 0 ? totalAmountData[0].total : 0;
+
+
+    let feesResult = [];
+    // let totalAmount = 0;
+
+    for (let i = 0; i < latestPayments.length; i++) {
+      const fee = latestPayments[i].toObject();
+
+      delete fee.userId;
+
+      // totalAmount += fee.amount ? fee.amount : 0;
+
+      feesResult.push({
+        feesData: fee
+      });
+    }
+
+    // ---------------------------------------------------
+    // 🔹 4) Counts
+    // ---------------------------------------------------
+    const totalCourse = await CourseRecord.countDocuments({
+      userId: req.user.userId
+    });
+
+    const totalStudentCount = await StudentRecord.countDocuments({
+      userId: req.user.userId
+    });
+
+    // ---------------------------------------------------
+    // 🔹 5) Final Response
+    // ---------------------------------------------------
+    return res.status(200).json({
+      status: true,
+      message: "Home API data fetched successfully!",
+
+      totalCourse,
+      totalStudent: totalStudentCount,
+      totalAmount,
+
+      courseList: courseResult,
+      studentListssss: studentResult,
+      feesHistoryList: feesResult
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: "Internal server Error",
+      error: error.message
+    });
+  }
+});
+
 
 
 module.exports = routes;
